@@ -3,12 +3,8 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 
-def test_uniform_ccs_fast():
-    G, cells, _, _ = pr.uniform_cc(20, 0.5, 20, fast_sampling=True)
-    assert len(cells) > 0, "No 2-cells sampled"
-
-def test_uniform_ccs_slow():
-    G, cells, _, _ = pr.uniform_cc(20, 0.5, 20, fast_sampling=False)
+def test_uniform_ccs():
+    G, cells, _, _ = pr.uniform_cc(20, 0.5, 20)
     assert len(cells) > 0, "No 2-cells sampled"
 
 def test_estimate_cycle_count():

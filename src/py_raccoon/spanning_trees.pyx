@@ -1,12 +1,17 @@
 # distutils: language=c++
-# cython: profile=True
+# cython: linetrace=True
 """
-Functions to 
+Functions to sample spanning trees and perform calculations on them.
 """
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import graph_tool.all as gt
+
 from libc.stdlib cimport malloc, free
+from libc.stdio cimport printf
 from libcpp.vector cimport vector
-#cimport numpy as np
 import networkx as nx
 import numpy as np
 import cython
@@ -113,7 +118,7 @@ def lowest_common_ancestor_py(parent: list, node_pairs: list) -> list[tuple]:
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef LcaResult* lowest_common_ancestor(int[:] parent, Edge[:] node_pairs):
+cdef LcaResult* lowest_common_ancestor(int[:] parent, Edge[:] node_pairs) nogil:
     """
     Implementation of Tarjan's off-line lowest common ancestors algorithm
     (https://en.wikipedia.org/wiki/Tarjan%27s_off-line_lowest_common_ancestors_algorithm, https://doi.org/10.1145%2F322154.322161)
@@ -125,7 +130,6 @@ cdef LcaResult* lowest_common_ancestor(int[:] parent, Edge[:] node_pairs):
 
     Note that Tarjan later gave an improved algorithm with complexity O(n+m).
     Since the Ackermann function grows so fast, α is almost constant.
-    It is especially faster than the sorting we perform afterward.
     """
     cdef int p_size = parent.shape[0]
     cdef char* node_color = <char*> malloc(p_size * sizeof(char))
@@ -145,7 +149,6 @@ cdef LcaResult* lowest_common_ancestor(int[:] parent, Edge[:] node_pairs):
         children[i] = new vector[int]()
         queries[i] = new vector[LcaLookup]()
 
-
     try:
         # need to traverse the spanning tree top-down
         root = -1
@@ -156,11 +159,6 @@ cdef LcaResult* lowest_common_ancestor(int[:] parent, Edge[:] node_pairs):
             else:
                 root = node
 
-        # need to efficiently retrieve queries
-        # node -> (other, edge[0], edge[1])
-        #queries: list[list[tuple[int,int,int]]] = [ [] for _ in range(parent.shape[0])]
-        #queries = np.empty(parent.shape[0], dtype=object)
-
         for i in range(node_pairs.shape[0]):
             edge = node_pairs[i]
             a = edge.a
@@ -169,6 +167,8 @@ cdef LcaResult* lowest_common_ancestor(int[:] parent, Edge[:] node_pairs):
             queries[b][0].push_back(LcaLookup(a,a,b))
         
         __inner_lca(root, children, queries, result, &result_count, partition, ancestor, node_color)
+        if result_count != node_pairs.shape[0]:
+            printf("[WARN] Inconsistency in lowest common ancestor. Does the Graph have self-loops?")
 
     finally:
         free(ancestor)
@@ -240,14 +240,15 @@ def calc_depth(parent: np.ndarray) -> np.ndarray:
     cdef int[:] cparent = parent
 
     for i in range(len(parent)):
-        __calc_depth_check(i, cparent, cdepth)
+        if cdepth[i] == -1:
+            __calc_depth_check(i, cparent, cdepth)
     return depth
 
 @cython.wraparound(False)
 cdef int uniform_spanning_tree_c(int size, int[:] degree, int** neighbors, int[:] parent, rnd):
     cdef mt19937 c_rnd = mt19937(rnd.integers(0, 1 << 32))
     cdef uniform_int_distribution[int] dist = uniform_int_distribution[int](0, size - 1)
-    cdef int root = dist(c_rnd) #rnd.choice(size) #rand() % size
+    cdef int root = dist(c_rnd)
     cdef int i, u, choice
 
     cdef bint* in_tree = <bint*> malloc(size * sizeof(bint))
@@ -262,7 +263,7 @@ cdef int uniform_spanning_tree_c(int size, int[:] degree, int** neighbors, int[:
             u = i
             while not in_tree[u]:
                 dist = uniform_int_distribution[int](0, degree[u] - 1)
-                choice = dist(c_rnd) #c_rnd() % degree[u] # random(c_rnd, degree[u]) #rand() % degree[u]#rnd.choice(degree[u]) # 
+                choice = dist(c_rnd)
                 parent[u] = neighbors[u][choice]
                 u = parent[u]
             
@@ -284,26 +285,42 @@ cdef int** graph_to_neighbors(int size, int[:] degree, G):
             neighbors[i][j] = u
     return neighbors
 
+@cython.wraparound(False)
+cdef int** graph_to_neighbors_gt(int size, int[:] degree, G):
+    cdef int** neighbors = <int**> malloc(sizeof(int*) * size)
+    cdef int i, j, u
+    cdef int[:] neighs
+    for i in range(size):
+        neighbors[i] = <int*> malloc(degree[i] * sizeof(int))
+        neighs = G.get_all_neighbors(i).astype(np.int32)
+        for j, u in enumerate(neighs):
+            neighbors[i][j] = u
+    return neighbors
+
 cdef void free_graph_neighbors(int size, int** neighbors):
     for i in range(size):
         free(neighbors[i])
     free(neighbors)
 
-def uniform_spanning_tree(G: nx.Graph, rnd: np.random.Generator) -> np.ndarray[np.int32]:
+def uniform_spanning_tree(G: nx.Graph | gt.Graph, rnd: np.random.Generator) -> np.ndarray[np.int32]:
     """
     Implements Wilson's Algorithm for random spanning trees [1].
     Assumes G to be undirected and connected.
 
     [1] David Bruce Wilson. 1996. Generating random spanning trees more quickly than the cover time. In Proceedings of the twenty-eighth annual ACM symposium on Theory of Computing (STOC '96). Association for Computing Machinery, New York, NY, USA, 296–303. https://doi.org/10.1145/237814.237880
     """
-    cdef int size = len(G.nodes)
-    cdef int[:] degree = np.array(G.degree, dtype=np.int32)[:,1]
+    cdef int size = len(G.nodes) if isinstance(G, nx.Graph) else G.num_vertices()
+    if isinstance(G, nx.Graph):
+        node_degree = np.array(G.degree, dtype=np.int32)
+        degree_np = node_degree[:,1][node_degree[:,0].argsort()] # nx may not consider the nodes to be in ascending order by their id
+    else:
+        degree_np = np.array(G.get_total_degrees(G.vertex_index), dtype=np.int32)
+    cdef int[:] degree = degree_np
     np_parent = np.zeros(size, dtype=np.int32)
     cdef int[:] parent = np_parent
-    neighbors = graph_to_neighbors(size, degree, G)
+    neighbors = graph_to_neighbors(size, degree, G) if isinstance(G, nx.Graph) else graph_to_neighbors_gt(size, degree, G)
 
     try:
-        #srand(rnd.choice(100) + 5)
         uniform_spanning_tree_c(size, degree, neighbors, parent, rnd)
     finally:
         free_graph_neighbors(size, neighbors)
@@ -311,21 +328,22 @@ def uniform_spanning_tree(G: nx.Graph, rnd: np.random.Generator) -> np.ndarray[n
     return np_parent
 
 @cython.wraparound(False)
-cdef void __calc_property_check(int node, int[:] parent, char[:] checked, double[:] result, double root_val, int[:] degree, double (*update_fun)(int, int, double, int[:])):
+cdef void __calc_property_check(int node, int[:] parent, char[:] checked, double[:] result, double root_val, int[:] degree, double mean_degree, double (*update_fun)(int, int, double, int[:], double)):
     if node != -1:
         p = parent[node]
         if p != -1 and checked[node] == 0:
             if checked[p] == 0:
-                __calc_property_check(p, parent, checked, result, root_val, degree, update_fun)
-            result[node] = update_fun(node, p, result[p], degree)
+                __calc_property_check(p, parent, checked, result, root_val, degree, mean_degree, update_fun)
+            result[node] = update_fun(node, p, result[p], degree, mean_degree)
             checked[node] = 1
         if p == -1 and checked[node] == 0:
             result[node] = root_val
 
 @cython.wraparound(False)
-cdef void calc_property_fast(int[:] parent, double[:] result, double root_val, int[:] degree, double (*update_fun)(int, int, double, int[:])):
+cdef void calc_property_fast(int[:] parent, double[:] result, double root_val, int[:] degree, double mean_degree, double (*update_fun)(int, int, double, int[:], double)):
     checked_np = np.zeros(len(parent), dtype=np.int8)
     cdef char[:] checked = checked_np
 
     for i in range(len(parent)):
-        __calc_property_check(i, parent, checked, result, root_val, degree, update_fun)
+        if not checked[i]:
+            __calc_property_check(i, parent, checked, result, root_val, degree, mean_degree, update_fun)

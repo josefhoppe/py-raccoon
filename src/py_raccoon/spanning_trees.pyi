@@ -8,3 +8,8 @@ def uniform_spanning_tree(G: nx.Graph, rnd: np.random.Generator) -> np.ndarray[n
 
     [1] David Bruce Wilson. 1996. Generating random spanning trees more quickly than the cover time. In Proceedings of the twenty-eighth annual ACM symposium on Theory of Computing (STOC '96). Association for Computing Machinery, New York, NY, USA, 296–303. https://doi.org/10.1145/237814.237880
     """
+
+def get_induced_cycle(edge: tuple[int, int], parent: np.ndarray, depth: np.ndarray) -> tuple:
+    """
+    Gets the cycle induced by adding edge to the spanning tree modeled by node_level and parent_node
+    """

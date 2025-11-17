@@ -4,8 +4,6 @@ PyRaCCooN: Random Cell Complexes on Networks
 Generates random cell complexes.
 """
 
-import py_raccoon.sampling
-import py_raccoon.spanning_trees
-import py_raccoon.utils
+from . import sampling, spanning_trees, utils
 
-from py_raccoon.sampling import uniform_cc, estimate_cycle_count
+from .interface import uniform_cc, estimate_cycle_count, sample_cycle_space

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py-raccoon"
-version = "1.0.1"
+version = "1.1.0"
 authors = [
   { name="Josef Hoppe", email="hoppe@cs.rwth-aachen.de" },
 ]
