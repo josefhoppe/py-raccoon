@@ -7,13 +7,13 @@
 ![Python version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fjosefhoppe%2Fpy-raccoon%2Fmain%2Fpyproject.toml&logo=python&logoColor=ffd242)
 [![Package version on PyPI](https://img.shields.io/pypi/v/py-raccoon?logo=pypi&logoColor=ffd242)](https://pypi.org/project/py-raccoon/)
 
-PyRaCCooN (**Ra**ndom **C**ell **Co**mplexes **o**n **N**etworks) randomly generates cell complexes and and provides an approximation for the number of simple cycles (by length) on a graph.
+PyRaCCooN (**Ra**ndom **C**ell **Co**mplexes **o**n **N**etworks) randomly generates cell complexes and provides an approximation for the number of simple cycles (by length) on a graph.
 PyRaCCooN also exposes the spanning-tree-based algorithm that samples the cycle space via an API, to enable easy adoption for further analyses.
 To see how to use PyRaCCooN, check out the Jupyter [examples](https://github.com/josefhoppe/py-raccoon/tree/main/examples) or the short examples below.
 
 For the sampling, PyRaCCooN
 
-- generates random cell complexes by sampling an Erdös-Rényi Graph and random 2-cells, or
+- generates random cell complexes by sampling an Erdős-Rényi Graph and random 2-cells, or
 - samples random 2-cells on arbitrary graphs.
 
 For all tasks, it uses the same sampling algorithm that is designed to work on ER-graphs, so the approximation may be less accurate on other graphs.
@@ -40,6 +40,27 @@ If you use PyRaCCooN, please cite the following paper:
 
 ```bash
 pip install py-raccoon
+```
+
+### Exact occurrence probabilities (optional)
+
+By default, PyRaCCooN uses a fast approximation of the probability that a cycle is induced by a uniform spanning tree (`approx_prob=True`).
+This approximation assumes even connectivity (similar to Erdős-Rényi graphs) and has a strong bias for some graph classes, especially (nearly) planar graphs and / or graphs with a large diameter.
+With `approx_prob=False`, PyRaCCooN calculates the exact probability instead, which is significantly slower.
+
+The exact probability requires [scikit-sparse](https://github.com/scikit-sparse/scikit-sparse) (>= 0.5.0, Python >= 3.10), which is an optional dependency.
+Refer to the scikit-sparse documentation for instructions on how to install scikit-sparse and its dependency SuiteSparse.
+The easiest way is to install scikit-sparse via conda:
+
+```bash
+conda install -c conda-forge scikit-sparse
+pip install py-raccoon
+```
+
+Alternatively, if SuiteSparse is installed:
+
+```bash
+pip install py-raccoon[exact]
 ```
 
 ## Generating Random Cell Complexes (by expected number of 2-cells)
@@ -131,7 +152,7 @@ Also note that eventually, longer cycles won't occur at all, leading to an incor
 
 ## Taming the cycle space
 
-The core idea of sampling a uniform spanning tree and calculating the occurence probability for all induced cycles is exposed directly through the method `sample_cycle_space`:
+The core idea of sampling a uniform spanning tree and calculating the occurrence probability for all induced cycles is exposed directly through the method `sample_cycle_space`:
 
 ```py
 import py_raccoon as pr
@@ -152,9 +173,9 @@ The method returns the spanning tree and properties of the cycles, divided into 
   - depth: array listing the depth of each node in the tree (distance to root)
 - cycles (represented via edges (u,v) that induce the cycles)
   - us: list of first nodes of the edges
-  - vs: list of second nodes of the edgs
+  - vs: list of second nodes of the edges
   - lcas: list of lowest common ancestors of u and v
-  - p_cs: occurence probability p_c (rho_c in the paper)
+  - p_cs: occurrence probability p_c (rho_c in the paper)
 
 This enables us to calculate new properties, either directly or indirectly.
 For example, it is simple to calculate the length of the induced cycles:
@@ -164,7 +185,7 @@ For example, it is simple to calculate the length of the induced cycles:
 lengths = depth[us] + depth[vs] - 2 * depth[lcas] + 1
 ```
 
-More complicated calculations require us to traverse the tree ourselves, calculating an array similar to `depth` or the aggregates used for calculating the occurence probability.
+More complicated calculations require us to traverse the tree ourselves, calculating an array similar to `depth` or the aggregates used for calculating the occurrence probability.
 For an example, see this [Jupyter Notebook](examples/CycleSpace.ipynb).
 
 ## Runtime behavior

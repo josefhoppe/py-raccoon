@@ -11,5 +11,5 @@ def uniform_spanning_tree(G: nx.Graph, rnd: np.random.Generator) -> np.ndarray[n
 
 def get_induced_cycle(edge: tuple[int, int], parent: np.ndarray, depth: np.ndarray) -> tuple:
     """
-    Gets the cycle induced by adding edge to the spanning tree modeled by node_level and parent_node
+    Gets the cycle induced by adding edge to the spanning tree modeled by parent and depth
     """

@@ -56,7 +56,7 @@ cdef struct LcaLookup:
 
 cdef inline int* uf_init(int size) nogil:
     """
-    Initializes union-find datastructure with size many elements, each in their own partition
+    Initializes union-find data structure with size many elements, each in their own partition
     """
     cdef int* ancestor = <int*> malloc(size * sizeof(int))
     cdef int i
@@ -66,7 +66,7 @@ cdef inline int* uf_init(int size) nogil:
 
 cdef inline int uf_find(int* parent, int item) nogil:
     """
-    Find operation of union-find datastructure.
+    Find operation of union-find data structure.
     parent has to be a valid array obtained through union and find operations, starting
     with a valid initialized array (e.g. uf_init)
     """
@@ -123,7 +123,7 @@ cdef LcaResult* lowest_common_ancestor(int[:] parent, Edge[:] node_pairs) nogil:
     Implementation of Tarjan's off-line lowest common ancestors algorithm
     (https://en.wikipedia.org/wiki/Tarjan%27s_off-line_lowest_common_ancestors_algorithm, https://doi.org/10.1145%2F322154.322161)
 
-    Returns set of tuples (node a, node b, ancestor)
+    Returns array of LcaResult (node a, node b, ancestor), one per node pair; must be freed by the caller.
 
     The time complexity is in O(n + m * α(n + m)) for n = |nodes|, m = |node_pairs|
     (α is the inverse of the Ackermann function f(x) = A(x,x))
@@ -196,7 +196,7 @@ def normalize_cell(cell: tuple) -> tuple:
 
 def get_induced_cycle(edge: Tuple[int, int], parent: np.ndarray, depth: np.ndarray) -> tuple:
     """
-    Gets the cycle induced by adding edge to the spanning tree modeled by node_level and parent_node
+    Gets the cycle induced by adding edge to the spanning tree modeled by parent and depth
     """
     left = []
     right = []
@@ -226,7 +226,7 @@ def get_induced_cycle(edge: Tuple[int, int], parent: np.ndarray, depth: np.ndarr
 cdef int __calc_depth_check(int node, int[:] parent, int[:] depth):
     if node != -1 and depth[node] == -1:
         if parent[node] == -1:
-            depth[node] == 0
+            depth[node] = 0
         else:
             __calc_depth_check(parent[node], parent, depth)
             depth[node] = depth[parent[node]] + 1
